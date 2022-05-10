@@ -27,6 +27,15 @@
         {% endif %}
         <p>{{ form.is_private() }} {{ form.is_private.label }}</p>
         <p>{{ form.submit(type="submit", class="btn btn-primary") }}</p>
+        {% if users %}
+        <h2>Участники курса</h2>
+        {% endif %}
+        {% for i in users %}
+        <div>
+            <p>{{ i[0] }}</p>
+            <a href="/delete_user/{{ i[1] }}/{{course}}" class="btn btn-danger">Удалить</a>
+        </div>
+        {% endfor %}
 
         {{ message }}
     </form>

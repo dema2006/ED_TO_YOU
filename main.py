@@ -17,6 +17,21 @@ login_manager.init_app(app)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
 
 
+def return_students(course_id):
+    db_sess = db_session.create_session()
+    course = db_sess.query(Course).filter(Course.id == course_id).first()
+    if course:
+        a = list(map(int, course.included_users.split()))
+        a.remove(course.user_id)
+        users = list()
+        for i in a:
+            user = db_sess.query(User).filter(User.id == i).first()
+            users.append((user.name, i))
+    else:
+        users = []
+    return users
+
+
 @login_manager.user_loader
 def load_user(user_id):
     db_sess = db_session.create_session()
@@ -60,6 +75,21 @@ def add_news():
     return render_template('news.html', title='Добавление новости', form=form, inv=0)
 
 
+@app.route("/delete_user/<int:user_id>/<int:course_id>", methods=['GET', 'POST'])
+@login_required
+def delete_user(user_id, course_id):
+    db_sess = db_session.create_session()
+    course = db_sess.query(Course).filter(Course.id == course_id).first()
+    if course:
+        a = list(set(list(map(str, course.included_users.split()))))
+        a.remove(str(user_id))
+        course.included_users = " ".join(a)
+        db_sess.commit()
+        return redirect(f'/news/{course_id}')
+    else:
+        abort(404)
+
+
 @app.route('/news_delete/<int:id>', methods=['GET', 'POST'])
 @login_required
 def news_delete(id):
@@ -73,9 +103,24 @@ def news_delete(id):
     return redirect('/')
 
 
+@app.route('/lesson_delete/<int:id>', methods=['GET', 'POST'])
+@login_required
+def lesson_delete(id):
+    db_sess = db_session.create_session()
+    news = db_sess.query(Lesson).filter(Lesson.id == id).first()
+    if news:
+        id = news.course
+        db_sess.delete(news)
+        db_sess.commit()
+    else:
+        abort(404)
+    return redirect(f'/course_info/{id}')
+
+
 @app.route('/news/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_news(id):
+    users = return_students(id)
     form = NewsForm()
     if request.method == "GET":
         db_sess = db_session.create_session()
@@ -113,7 +158,7 @@ def edit_news(id):
     print(inv)
     db_sess.commit()
 
-    return render_template('news.html', title='Редактирование курса', form=form, inv=inv)
+    return render_template('news.html', title='Редактирование курса', form=form, inv=inv, users=users, course=id)
 
 
 @app.route("/")
@@ -226,6 +271,39 @@ def invite_people():
 
         return redirect("/")
     return render_template("invite.html", title="Добавление к курсу", form=form)
+
+
+@app.route('/edit_lesson/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit_lesson(id):
+    form = LessonForm()
+    if request.method == "GET":
+        db_sess = db_session.create_session()
+        lesson = db_sess.query(Lesson).filter(Lesson.id == id).first()
+        if Course:
+            form.title.data = lesson.title
+            form.content.data = lesson.content
+            # form.is_private.data = news.is_private
+        else:
+            abort(404)
+    if form.validate_on_submit():
+        # to_add = form.add_users.data
+        # try:
+        #     a = map(int, to_add.split())
+        # except:
+        #     return render_template('news.html', title='Добавление новости', form=form,
+        #                            message="Неправильно введены id для добавления")
+        db_sess = db_session.create_session()
+        course = db_sess.query(Lesson).filter(Lesson.id == id).first()
+        if course:
+            course.title = form.title.data
+            course.content = form.content.data
+            db_sess.commit()
+            return redirect(f'/course_info/{course.course}')
+        else:
+            abort(404)
+    db_sess = db_session.create_session()
+    return render_template('add_lesson.html', title='Редактирование курса', form=form)
 
 
 if __name__ == '__main__':
